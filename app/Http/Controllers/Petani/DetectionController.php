@@ -140,7 +140,7 @@ class DetectionController extends Controller
 
     private function sendTelegramNotification($detection, $aiResults, $recommendationText)
     {
-        $botToken = '8434442028:AAH6CuTkZOxR4bQn3jCNiyv78FDLkBqNvRA';
+        $botToken = env('TELEGRAM_BOT_TOKEN');
         
         $petani = clone $detection->user;
         $petani->load('village.penyuluh');

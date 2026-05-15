@@ -9,7 +9,12 @@ use Illuminate\Support\Facades\Storage;
 
 class TelegramWebhookController extends Controller
 {
-    private $botToken = '8434442028:AAH6CuTkZOxR4bQn3jCNiyv78FDLkBqNvRA';
+    private $botToken;
+
+    public function __construct()
+    {
+        $this->botToken = env('TELEGRAM_BOT_TOKEN');
+    }
 
     public function handle(Request $request)
     {

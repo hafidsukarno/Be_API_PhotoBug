@@ -5,13 +5,64 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Village;
 use App\Models\User;
+use App\Models\Detection;
+use App\Models\DetectionResult;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class VillageController extends Controller
 {
     public function index()
     {
-        return response()->json(Village::all());
+        $villages = Village::with('penyuluh')->get();
+
+        return response()->json([
+            'status' => 'success',
+            'total_villages' => count($villages),
+            'data' => $villages->map(function ($village) {
+                return [
+                    'id' => $village->id,
+                    'village_name' => $village->village_name,
+                    'district' => $village->district
+                ];
+            })
+        ]);
+    }
+
+    // Get desa dengan statistik laporan dan hama
+    public function getVillagesReport()
+    {
+        $villages = Village::with('penyuluh')->get();
+
+        $villagesTotalStats = $villages->map(function ($village) {
+            // Total laporan di desa ini
+            $totalReports = Detection::whereIn('user_id', function ($q) use ($village) {
+                $q->select('id')->from('users')->where('village_id', $village->id);
+            })->count();
+
+            // Total hama yang terdeteksi (jumlah, bukan jenis)
+            $totalPests = DetectionResult::whereHas('detection', function ($query) use ($village) {
+                $query->whereIn('user_id', function ($q) use ($village) {
+                    $q->select('id')->from('users')->where('village_id', $village->id);
+                });
+            })->count();
+
+            return [
+                'id' => $village->id,
+                'village_name' => $village->village_name,
+                'district' => $village->district,
+                'penyuluh_name' => $village->penyuluh?->name ?? 'Belum Ditugaskan',
+                'penyuluh_id' => $village->penyuluh_id,
+                'total_reports' => $totalReports,
+                'total_pests_detected' => $totalPests
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'total_villages' => count($villagesTotalStats),
+            'data' => $villagesTotalStats
+        ]);
     }
 
     public function store(Request $request)

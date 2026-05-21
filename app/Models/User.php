@@ -66,4 +66,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Village::class, 'penyuluh_id'); // Untuk penyuluh (banyak desa)
     }
+
+    public function detections()
+    {
+        return $this->hasMany(Detection::class); // Laporan deteksi petani
+    }
 }

@@ -40,8 +40,7 @@ class RecommendationController extends Controller
 
         return response()->json([
             'message' => 'Rekomendasi berhasil diberikan. Status laporan diubah menjadi selesai.',
-            'recommendation' => $recommendation->load('createdBy'),
-            'detection' => $detection->load('detectionResults', 'recommendations.createdBy')
+            'recommendation' => $recommendation->load('createdBy')
         ], 201);
     }
 }

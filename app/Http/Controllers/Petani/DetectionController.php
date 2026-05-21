@@ -20,8 +20,6 @@ class DetectionController extends Controller
         $request->validate([
             'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // Max 5MB
             'description' => 'nullable|string',
-            'latitude' => 'nullable|numeric',
-            'longitude' => 'nullable|numeric'
         ]);
 
         $user = $request->user();
@@ -29,19 +27,12 @@ class DetectionController extends Controller
         // Simpan gambar ke storage
         $imagePath = $request->file('image')->store('detections', 'public');
 
-        // Buat record deteksi
-        $location = null;
-        if ($request->latitude && $request->longitude) {
-            $location = $request->latitude . ',' . $request->longitude;
-        }
-
         $detection = Detection::create([
             'user_id' => $user->id,
             'image_path' => $imagePath,
             'detected_at' => now(),
             'status' => 'pending',
             'description' => $request->description,
-            'location' => $location,
         ]);
 
         // Hubungkan ke Python API FastAPI (YOLOv11)
@@ -126,15 +117,42 @@ class DetectionController extends Controller
         // ==========================================
         // 🟢 KIRIM NOTIFIKASI KE TELEGRAM PENYULUH 
         // ==========================================
-        try {
-            $this->sendTelegramNotification($detection, $aiResults, $recommendationText);
-        } catch (\Exception $e) {
-            Log::error('Gagal mengirim Telegram Webhook: ' . $e->getMessage());
+        // Hanya kirim ke Telegram jika ada hama yang terdeteksi dengan akurasi >= 50%
+        $shouldSendTelegram = false;
+        foreach ($aiResults as $result) {
+            if ($result['pest_name'] !== 'Tidak Terdeteksi (Silakan Tunggu Penyuluh)' && $result['confidence'] >= 50) {
+                $shouldSendTelegram = true;
+                break;
+            }
         }
+
+        if ($shouldSendTelegram) {
+            try {
+                $this->sendTelegramNotification($detection, $aiResults, $recommendationText);
+            } catch (\Exception $e) {
+                Log::error('Gagal mengirim Telegram Webhook: ' . $e->getMessage());
+            }
+        } else {
+            Log::info('Telegram tidak dikirim: Hama tidak terdeteksi atau akurasi < 50%');
+        }
+
+        // Load relationships
+        $detection->load('detectionResults', 'recommendations', 'user.village.penyuluh');
+        
+        // Get penyuluh name
+        $penyuluhName = null;
+        if ($detection->user && $detection->user->village && $detection->user->village->penyuluh) {
+            $penyuluhName = $detection->user->village->penyuluh->name;
+        }
+
+        // Count total pests
+        $totalPests = $detection->detectionResults->count();
 
         return response()->json([
             'message' => 'Deteksi berhasil disimpan',
-            'detection' => $detection->load('detectionResults', 'recommendations')
+            'detection' => $detection,
+            'penyuluh_name' => $penyuluhName,
+            'total_pests' => $totalPests
         ], 201);
     }
 
@@ -230,13 +248,55 @@ class DetectionController extends Controller
     // Lihat detail deteksi tertentu
     public function show($id)
     {
-        $detection = Detection::with('detectionResults', 'recommendations.createdBy')->findOrFail($id);
+        $detection = Detection::with('detectionResults', 'recommendations.createdBy', 'user.village.penyuluh')->findOrFail($id);
         
         // Verifikasi bahwa petani hanya bisa melihat milik sendiri
         if ($detection->user_id !== auth()->id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        return response()->json($detection);
+        // Get penyuluh name
+        $penyuluhName = null;
+        if ($detection->user && $detection->user->village && $detection->user->village->penyuluh) {
+            $penyuluhName = $detection->user->village->penyuluh->name;
+        }
+
+        // Count total pests
+        $totalPests = $detection->detectionResults->count();
+
+        return response()->json([
+            'message' => 'Detail Deteksi',
+            'detection' => $detection,
+            'penyuluh_name' => $penyuluhName,
+            'total_pests' => $totalPests
+        ]);
+    }
+
+    // Status laporan untuk petani
+    public function reportStatus(Request $request)
+    {
+        $user = $request->user();
+        
+        // Total laporan dikirim
+        $totalSent = Detection::where('user_id', $user->id)->count();
+        
+        // Laporan menunggu (pending - belum diverifikasi penyuluh)
+        $waiting = Detection::where('user_id', $user->id)
+                            ->where('status', 'pending')
+                            ->count();
+        
+        // Laporan diverifikasi (completed - sudah diverifikasi penyuluh)
+        $verified = Detection::where('user_id', $user->id)
+                            ->where('status', 'completed')
+                            ->count();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'total_sent' => $totalSent,
+                'waiting_verification' => $waiting,
+                'verified' => $verified
+            ]
+        ]);
     }
 }

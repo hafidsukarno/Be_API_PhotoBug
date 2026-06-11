@@ -90,10 +90,17 @@ class DetectionController extends Controller
             ]);
         }
 
-        // Kamus rekomendasi dummy berdasarkan jenis hama
+        // Kamus rekomendasi berdasarkan standar pertanian (BPP) (Gunakan lowercase untuk keys)
         $dummyRecommendations = [
-            'Wereng Cokelat' => 'Gunakan insektisida berbahan aktif buprofezin atau pymetrozin. Jaga jarak tanam jangan terlalu rapat dan gunakan varietas padi yang tahan wereng cokelat.',
-            'Wereng Hijau' => 'Segera lakukan penyemprotan insektisida berbahan aktif imidakloprid atau BPMC. Bersihkan gulma di sekitar area persawahan yang bisa menjadi sarang inang alternatif.',
+            'wereng coklat' => '1. Keringkan lahan sawah secara berkala (jangan digenangi terus) untuk mengurangi kelembapan yang disukai hama ini.' . "\n" . 
+                               '2. Segera gunakan insektisida berbahan aktif Buprofezin, Pimetrozin, atau BPMC jika jumlah wereng >10 ekor/rumpun. Arahkan semprotan langsung ke pangkal batang bawah.' . "\n" . 
+                               '3. Untuk musim berikutnya, terapkan sistem tanam Jajar Legowo dan gunakan varietas tahan wereng (VUTW).',
+            'wereng cokelat' => '1. Keringkan lahan sawah secara berkala (jangan digenangi terus) untuk mengurangi kelembapan yang disukai hama ini.' . "\n" . 
+                                '2. Segera gunakan insektisida berbahan aktif Buprofezin, Pimetrozin, atau BPMC jika jumlah wereng >10 ekor/rumpun. Arahkan semprotan langsung ke pangkal batang bawah.' . "\n" . 
+                                '3. Untuk musim berikutnya, terapkan sistem tanam Jajar Legowo dan gunakan varietas tahan wereng (VUTW).',
+            'wereng hijau' => '1. Waspadai penularan penyakit virus Tungro (daun padi berubah kuning-oranye dan kerdil) yang dibawa oleh Wereng Hijau.' . "\n" . 
+                              '2. Bersihkan gulma di sekitar lahan karena bisa menjadi inang virus.' . "\n" . 
+                              '3. Jika serangan parah, lakukan penyemprotan pestisida berbahan aktif Lamdasilahotrin atau Tiametoksam sesuai dosis yang dianjurkan.',
         ];
 
         // Buat rekomendasi awal dari AI
@@ -101,7 +108,8 @@ class DetectionController extends Controller
         
         if ($topResult['confidence'] > 0) {
             $pestName = $topResult['pest_name'];
-            $aiAdvice = $dummyRecommendations[$pestName] ?? 'Silakan konsultasikan dengan penyuluh untuk penanganan lebih lanjut.';
+            $lookupName = strtolower($pestName); // Pastikan lowercase agar cocok dengan kamus
+            $aiAdvice = $dummyRecommendations[$lookupName] ?? 'Silakan konsultasikan dengan penyuluh untuk penanganan lebih lanjut.';
             
             $recommendationText = "Tanaman terdeteksi terkena {$pestName} dengan akurasi {$topResult['confidence']}%. Rekomendasi Penanganan: {$aiAdvice}";
         } else {
@@ -183,19 +191,23 @@ class DetectionController extends Controller
         }
 
         $hasilDeteksiLists = "";
-        $no = 1;
+        $highestPest = "Tidak terdeteksi";
+        $highestConfidence = 0;
+
         foreach ($pestCounts as $pest => $data) {
             $count = $data['count'];
             $confidences = $data['confidences'];
             
             // Urutkan nilai akurasi dari yang terbesar ke terkecil
             rsort($confidences);
+            $topConfidenceForPest = $confidences[0];
+
+            if ($topConfidenceForPest > $highestConfidence) {
+                $highestConfidence = $topConfidenceForPest;
+                $highestPest = $pest;
+            }
             
-            // Format array akurasi menjadi string yang rapi dengan simbol %
-            $confString = implode(', ', array_map(function($val) { return $val . '%'; }, $confidences));
-            
-            $hasilDeteksiLists .= "{$no}. *{$pest}* ({$count} Temuan)\n     Akurasi: {$confString}\n";
-            $no++;
+            $hasilDeteksiLists .= "▸ {$pest} — {$topConfidenceForPest}% ✅\n     jumlah - {$count}\n";
         }
 
         // 2. Cari Penyuluh yang Menangani Desa ini (Untuk disebutkan namanya di laporan)
@@ -209,21 +221,24 @@ class DetectionController extends Controller
             $chatId = Storage::get('telegram_group_id.txt');
 
             // Teks Pesan Telegram (Markdown)
-            $catatan = $detection->description ? $detection->description : 'Tidak ada catatan khusus.';
-            $caption = "� *LAPORAN DETEKSI HAMA BPP KARANG TENGAH*\n"
-                     . "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                     . "📋 *DATA PELAPOR*\n"
-                     . "• NAMA PETANI : {$petani->name}\n"
-                     . "• LOKASI DESA : {$namaDesa}\n"
-                     . "• PENYULUH PJ : {$penyuluhName}\n"
-                     . "• WAKTU FOTO  : {$detection->detected_at}\n"
-                     . "• CATATAN     : {$catatan}\n\n"
-                     . "🔬 *HASIL IDENTIFIKASI AI*\n"
+            $catatan = $detection->description ? $detection->description : '-';
+            $waktu = \Carbon\Carbon::parse($detection->detected_at)->translatedFormat('d M Y, H:i');
+
+            $caption = "🌾 *PhotoBug — BPP Karang Tengah*\n"
+                     . "_Laporan Deteksi Hama Baru_\n"
+                     . "━━━━━━━━━━━━━━━━\n\n"
+                     . "⚠️ *Terdeteksi: {$highestPest}* (Akurasi {$highestConfidence}%)\n\n"
+                     . "👤 Petani      : *{$petani->name}*\n"
+                     . "📍 Lokasi      : *{$namaDesa}*\n"
+                     . "🧑‍🌾 Penyuluh PJ  : *{$penyuluhName}*\n"
+                     . "🕐 Waktu       : *{$waktu}*\n\n"
+                     . "📊 *Hasil Deteksi AI:*\n"
                      . "{$hasilDeteksiLists}\n"
-                     . "💡 *REKOMENDASI SEMENTARA AI*\n"
-                     . "{$recommendationText}\n"
-                     . "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                     . "Mohon kepada Penyuluh PJ untuk segera melakukan validasi dan memberikan rekomendasi tindakan kepada *{$petani->name}* melalui Aplikasi PhotoBug.";
+                     . "💡 *Rekomendasi Penanganan AI:*\n"
+                     . "_{$recommendationText}_\n\n"
+                     . "📋 _Catatan: {$catatan}_\n"
+                     . "━━━━━━━━━━━━━━━━\n"
+                     . "🔔 Mohon *Penyuluh {$penyuluhName}* segera melakukan validasi dan memberikan rekomendasi kepada petani *{$petani->name}* melalui aplikasi PhotoBug.";
 
             // Menggabungkan public storage url untuk image
             $imageLocalPath = storage_path('app/public/' . $detection->image_path);

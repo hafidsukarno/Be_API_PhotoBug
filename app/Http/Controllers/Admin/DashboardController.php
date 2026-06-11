@@ -67,34 +67,4 @@ class DashboardController extends Controller
         ]);
     }
 
-    // Get semua laporan (master report) dengan filter dan pagination
-    public function getAllReports(Request $request)
-    {
-        $status = $request->query('status'); // 'pending', 'completed', atau null (semua)
-
-        $query = Detection::with('user', 'detectionResults', 'recommendations.createdBy')
-                         ->orderBy('detected_at', 'desc');
-
-        // Filter berdasarkan status
-        if ($status) {
-            $query->where('status', $status);
-        }
-
-        $detections = $query->get();
-
-        return response()->json([
-            'total' => count($detections),
-            'pending_count' => Detection::where('status', 'pending')->count(),
-            'completed_count' => Detection::where('status', 'completed')->count(),
-            'data' => $detections
-        ]);
-    }
-
-    // Get detail laporan spesifik untuk admin
-    public function getReportDetail($id)
-    {
-        $detection = Detection::with('user', 'detectionResults', 'recommendations.createdBy')->findOrFail($id);
-
-        return response()->json($detection);
-    }
 }

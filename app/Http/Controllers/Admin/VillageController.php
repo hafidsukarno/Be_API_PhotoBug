@@ -35,16 +35,14 @@ class VillageController extends Controller
         $villages = Village::with('penyuluh')->get();
 
         $villagesTotalStats = $villages->map(function ($village) {
+            $userIds = \App\Models\User::where('village_id', $village->id)->pluck('id');
+
             // Total laporan di desa ini
-            $totalReports = Detection::whereIn('user_id', function ($q) use ($village) {
-                $q->select('id')->from('users')->where('village_id', $village->id);
-            })->count();
+            $totalReports = Detection::whereIn('user_id', $userIds)->count();
 
             // Total hama yang terdeteksi (jumlah, bukan jenis)
-            $totalPests = DetectionResult::whereHas('detection', function ($query) use ($village) {
-                $query->whereIn('user_id', function ($q) use ($village) {
-                    $q->select('id')->from('users')->where('village_id', $village->id);
-                });
+            $totalPests = DetectionResult::whereHas('detection', function ($query) use ($userIds) {
+                $query->whereIn('user_id', $userIds);
             })->count();
 
             return [
@@ -62,6 +60,21 @@ class VillageController extends Controller
             'status' => 'success',
             'total_villages' => count($villagesTotalStats),
             'data' => $villagesTotalStats
+        ]);
+    }
+
+    public function getVillagesStatus()
+    {
+        $villages = Village::all();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $villages->map(function ($village) {
+                return [
+                    'village_name' => $village->village_name,
+                    'status' => $village->penyuluh_id ? 'terisi' : 'kosong'
+                ];
+            })
         ]);
     }
 

@@ -80,12 +80,12 @@ Route::middleware('auth:sanctum')->group(function () {
         // Analytics Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/pest-statistics', [DashboardController::class, 'pestStatistics']);
-        Route::get('/reports', [DashboardController::class, 'getAllReports']);
-        Route::get('/reports/{id}', [DashboardController::class, 'getReportDetail']);
+
 
         // Kelola Desa
         Route::get('/villages', [AdminVillageController::class, 'index']);
         Route::get('/villages-report', [AdminVillageController::class, 'getVillagesReport']);
+        Route::get('/villages-status', [AdminVillageController::class, 'getVillagesStatus']);
         Route::post('/villages', [AdminVillageController::class, 'store']);
         Route::put('/villages/{id}', [AdminVillageController::class, 'update']);
         Route::delete('/villages/{id}', [AdminVillageController::class, 'destroy']);

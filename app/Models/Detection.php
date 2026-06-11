@@ -9,7 +9,7 @@ class Detection extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'image_path', 'detected_at', 'status', 'description', 'location'];
+    protected $fillable = ['user_id', 'image_path', 'detected_at', 'status', 'description'];
 
     public function user()
     {

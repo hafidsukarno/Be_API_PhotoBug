@@ -14,7 +14,6 @@ return new class extends Migration
             $table->string('image_path');
             $table->string('result_image_path')->nullable();
             $table->text('description')->nullable();
-            $table->string('location')->nullable(); // latitude,longitude
             $table->timestamp('detected_at')->useCurrent();
             $table->enum('status', ['pending', 'completed'])->default('pending');
             $table->timestamps();

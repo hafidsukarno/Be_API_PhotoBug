@@ -26,12 +26,10 @@ class DetectionController extends Controller
             ]);
         }
 
+        $userIds = \App\Models\User::whereIn('village_id', $villageIds)->pluck('id');
+
         // Query deteksi dari petani di desa yang ditangani
-        $query = Detection::whereIn('user_id', function ($q) use ($villageIds) {
-            $q->select('id')
-                ->from('users')
-                ->whereIn('village_id', $villageIds);
-        })
+        $query = Detection::whereIn('user_id', $userIds)
         ->with('user.village', 'detectionResults', 'recommendations.createdBy')
         ->orderByRaw("CASE WHEN status = 'pending' THEN 1 ELSE 2 END")
         ->orderBy('detected_at', 'desc');
@@ -58,12 +56,8 @@ class DetectionController extends Controller
 
         return response()->json([
             'total' => count($detections),
-            'pending_count' => Detection::whereIn('user_id', function ($q) use ($villageIds) {
-                $q->select('id')->from('users')->whereIn('village_id', $villageIds);
-            })->where('status', 'pending')->count(),
-            'completed_count' => Detection::whereIn('user_id', function ($q) use ($villageIds) {
-                $q->select('id')->from('users')->whereIn('village_id', $villageIds);
-            })->where('status', 'completed')->count(),
+            'pending_count' => Detection::whereIn('user_id', $userIds)->where('status', 'pending')->count(),
+            'completed_count' => Detection::whereIn('user_id', $userIds)->where('status', 'completed')->count(),
             'data' => $formattedDetections
         ]);
     }
@@ -124,20 +118,16 @@ class DetectionController extends Controller
             ]);
         }
 
+        $userIds = \App\Models\User::whereIn('village_id', $villageIds)->pluck('id');
+
         // Total laporan masuk dari desa yang ditangani
-        $totalIncoming = Detection::whereIn('user_id', function ($q) use ($villageIds) {
-            $q->select('id')->from('users')->whereIn('village_id', $villageIds);
-        })->count();
+        $totalIncoming = Detection::whereIn('user_id', $userIds)->count();
 
         // Laporan menunggu (pending - belum ada rekomendasi penyuluh)
-        $waiting = Detection::whereIn('user_id', function ($q) use ($villageIds) {
-            $q->select('id')->from('users')->whereIn('village_id', $villageIds);
-        })->where('status', 'pending')->count();
+        $waiting = Detection::whereIn('user_id', $userIds)->where('status', 'pending')->count();
 
         // Laporan selesai (completed - sudah ada rekomendasi dari penyuluh)
-        $completed = Detection::whereIn('user_id', function ($q) use ($villageIds) {
-            $q->select('id')->from('users')->whereIn('village_id', $villageIds);
-        })->where('status', 'completed')->count();
+        $completed = Detection::whereIn('user_id', $userIds)->where('status', 'completed')->count();
 
         return response()->json([
             'status' => 'success',
@@ -168,11 +158,11 @@ class DetectionController extends Controller
         // 6 bulan terakhir
         $sixMonthsAgo = Carbon::now()->subMonths(6);
 
+        $userIds = \App\Models\User::whereIn('village_id', $villageIds)->pluck('id');
+
         // Query detection results dari desa yang ditangani dalam 6 bulan terakhir
-        $pestTrends = DetectionResult::whereHas('detection', function ($query) use ($villageIds, $sixMonthsAgo) {
-            $query->whereIn('user_id', function ($q) use ($villageIds) {
-                $q->select('id')->from('users')->whereIn('village_id', $villageIds);
-            })
+        $pestTrends = DetectionResult::whereHas('detection', function ($query) use ($userIds, $sixMonthsAgo) {
+            $query->whereIn('user_id', $userIds)
             ->where('detected_at', '>=', $sixMonthsAgo);
         })
         ->selectRaw('pest_name, COUNT(*) as total_detected')
@@ -239,14 +229,12 @@ class DetectionController extends Controller
             ]);
         }
 
-        // Query laporan masuk dari desa yang ditangani, dengan detail lengkap
-        $total = Detection::whereIn('user_id', function ($q) use ($villageIds) {
-            $q->select('id')->from('users')->whereIn('village_id', $villageIds);
-        })->count();
+        $userIds = \App\Models\User::whereIn('village_id', $villageIds)->pluck('id');
 
-        $notifications = Detection::whereIn('user_id', function ($q) use ($villageIds) {
-            $q->select('id')->from('users')->whereIn('village_id', $villageIds);
-        })
+        // Query laporan masuk dari desa yang ditangani, dengan detail lengkap
+        $total = Detection::whereIn('user_id', $userIds)->count();
+
+        $notifications = Detection::whereIn('user_id', $userIds)
         ->with('user', 'user.village', 'detectionResults')
         ->orderBy('created_at', 'desc')
         ->skip(($page - 1) * $perPage)

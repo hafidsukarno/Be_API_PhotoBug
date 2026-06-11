@@ -11,9 +11,6 @@ class VillageSeeder extends Seeder
     {
         $villages = [
             ['village_name' => 'Sariwangi', 'district' => 'Sariwangi'],
-            ['village_name' => 'Cibodas', 'district' => 'Lembang'],
-            ['village_name' => 'Sukaratu', 'district' => 'Singaparna'],
-            ['village_name' => 'Cisurupan', 'district' => 'Cisurupan'],
         ];
 
         foreach ($villages as $village) {

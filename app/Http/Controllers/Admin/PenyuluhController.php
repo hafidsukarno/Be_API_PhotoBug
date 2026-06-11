@@ -74,12 +74,16 @@ class PenyuluhController extends Controller
         ], 201);
     }
 
-    // Edit desa tanggungan penyuluh saja
+    // Edit profil dan desa tanggungan penyuluh
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
 
         $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'username' => 'sometimes|required|string|max:255|unique:users,username,'.$user->id,
+            'email' => 'sometimes|required|string|email|max:255|unique:users,email,'.$user->id,
+            'no_hp' => 'nullable|string|max:20',
             'villages' => 'present|array',
             'villages.*' => 'exists:villages,id'
         ]);
@@ -99,6 +103,9 @@ class PenyuluhController extends Controller
             }
         }
 
+        // Update data profil
+        $user->update($request->only(['name', 'username', 'email', 'no_hp']));
+
         // Langsung update/sync desa yang dipegang
         // Reset desa lama
         \App\Models\Village::where('penyuluh_id', $user->id)->update(['penyuluh_id' => null]);
@@ -109,7 +116,7 @@ class PenyuluhController extends Controller
         }
 
         return response()->json([
-            'message' => 'Desa tanggungan penyuluh berhasil diupdate.',
+            'message' => 'Data dan desa tanggungan penyuluh berhasil diupdate.',
             'penyuluh' => $user->load('managedVillages')
         ]);
     }

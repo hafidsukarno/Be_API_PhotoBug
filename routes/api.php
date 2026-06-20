@@ -41,6 +41,10 @@ Route::get('/image/{path}', function ($path) {
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/request-otp-for-reset', [AuthController::class, 'requestOtpForReset']);
+Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
+Route::post('/reset-password-with-otp', [AuthController::class, 'resetPasswordWithOtp']);
+Route::post('/verify-email-for-reset', [AuthController::class, 'verifyEmailForReset']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 // Public endpoint untuk mendapatkan daftar village untuk registrasi
@@ -80,7 +84,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Analytics Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/pest-statistics', [DashboardController::class, 'pestStatistics']);
-
+        Route::get('/download-statistics-report', [DashboardController::class, 'downloadStatisticsReport']);
 
         // Kelola Desa
         Route::get('/villages', [AdminVillageController::class, 'index']);
